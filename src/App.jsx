@@ -253,6 +253,7 @@ function ChatRoom({roomId,rooms,setRooms,friends,msgs,setMessages,onBack,onProfi
   const endRef=useRef(null);
   const taRef=useRef(null);
   const lastBot=[...msgs].reverse().find(m=>m.senderId==="socrates");
+  const isSocratesRoom=Boolean(room&&room.members.includes("socrates"));
   const qr=useMemo(()=>{
     if(!lastBot||!lastBot.text) return [];
     const m=lastBot.text.match(/\[예시:(.*?)\]/);
@@ -267,20 +268,10 @@ function ChatRoom({roomId,rooms,setRooms,friends,msgs,setMessages,onBack,onProfi
     setMessages(p=>({...p,[roomId]:newMsgs}));
     setRooms(p=>p.map(r=>r.id===roomId?{...r,lastUpdate:Date.now()}:r));
     if(txt===undefined){setInput("");if(taRef.current)taRef.current.style.height="auto";}
-    if(room&&room.members.includes("socrates")){
+    if(isSocratesRoom){
       setTyping(true);
       try {
-        const history=newMsgs.map(m=>({role:m.senderId==="me"?"user":"assistant",content:m.text.replace(/\[예시:(.*?)\]/g,"")}));
-        const res=await fetch("https://api.anthropic.com/v1/messages",{
-          method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            model:"claude-haiku-4-5",max_tokens:1000,
-            system:"당신은 초등학교 6학년을 위한 친근한 수학 AI 튜터 '수크라테스'입니다. 소크라테스식 문답법으로 학생이 스스로 '분수의 나눗셈' 원리를 깨우치도록 돕습니다. 정답을 바로 알려주지 말고, 질문을 하나씩 던지세요.\n\n[반드시 지킬 규칙]\n1. 분수를 표현할 때는 절대로 수식을 쓰지 말고, 반드시 '[분수:분자/분모]' 형태로만 작성하세요. (예: 1/2 -> [분수:1/2])\n2. 말 마지막에는 항상 학생이 선택할 수 있는 예시 답변 2~3개를 '[예시:답변1|답변2|답변3]' 형태로 덧붙이세요.\n3. 이모지를 적절히 섞어 친구처럼 따뜻하게 대화하세요.\n4. 한 번에 질문은 하나만 하고, 짧고 명확하게 말하세요.\n5. 분모가 같은 분수의 나눗셈은 '몇 번 덜어낼 수 있는가(포함제)'로 설명하면 좋습니다.",
-            messages:history
-          })
-        });
-        const data=await res.json();
-        const reply=data&&data.content&&data.content[0]?data.content[0].text:null;
+        const reply="좋아, 먼저 네 생각을 한 번 말해줄래? 아직 AI 연결 전이라 간단한 안내만 보여주고 있어. [예시:분수 정리 화면을 볼게|그림으로 생각해볼게]";
         if(reply){
           setMessages(p=>({...p,[roomId]:[...(p[roomId]||[]),{id:`m_${Date.now()}`,senderId:"socrates",text:reply,timestamp:Date.now(),unread:0}]}));
           setRooms(p=>p.map(r=>r.id===roomId?{...r,lastUpdate:Date.now()}:r));
@@ -327,6 +318,9 @@ function ChatRoom({roomId,rooms,setRooms,friends,msgs,setMessages,onBack,onProfi
         <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",padding:8,display:"flex",alignItems:"center"}}><ChevronLeft size={32} color="#111"/></button>
         <span style={{fontWeight:700,fontSize:18,marginLeft:4}}>{room?room.name:""}</span>
       </div>
+      {isSocratesRoom ? <div style={{background:"rgba(255,255,255,0.72)",borderBottom:"1px solid rgba(0,0,0,0.05)",padding:"7px 16px",fontSize:12,fontWeight:700,color:"#374151",flexShrink:0}}>
+        소크라테스와 대화 중
+      </div> : null}
       <div style={{flex:1,overflowY:"auto",paddingTop:8,paddingBottom:16}}>
         {rendered}
         {typing ? <div style={{display:"flex",margin:"12px 16px"}}>
