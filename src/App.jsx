@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, User, MessageCircle, MoreHorizontal, ChevronLeft, UserPlus, Plus, Smile, Send, X, Play, Minus, BookOpen } from "lucide-react";
+import { askSocrates } from "./services/aiClient";
 
 const generateAppIcon = (emoji, bgColor) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${bgColor}"/><text x="50" y="50" font-size="50" text-anchor="middle" dominant-baseline="central">${emoji}</text></svg>`;
@@ -270,17 +271,8 @@ function ChatRoom({roomId,rooms,setRooms,friends,msgs,setMessages,onBack,onProfi
     if(room&&room.members.includes("socrates")){
       setTyping(true);
       try {
-        const history=newMsgs.map(m=>({role:m.senderId==="me"?"user":"assistant",content:m.text.replace(/\[예시:(.*?)\]/g,"")}));
-        const res=await fetch("https://api.anthropic.com/v1/messages",{
-          method:"POST",headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            model:"claude-haiku-4-5",max_tokens:1000,
-            system:"당신은 초등학교 6학년을 위한 친근한 수학 AI 튜터 '수크라테스'입니다. 소크라테스식 문답법으로 학생이 스스로 '분수의 나눗셈' 원리를 깨우치도록 돕습니다. 정답을 바로 알려주지 말고, 질문을 하나씩 던지세요.\n\n[반드시 지킬 규칙]\n1. 분수를 표현할 때는 절대로 수식을 쓰지 말고, 반드시 '[분수:분자/분모]' 형태로만 작성하세요. (예: 1/2 -> [분수:1/2])\n2. 말 마지막에는 항상 학생이 선택할 수 있는 예시 답변 2~3개를 '[예시:답변1|답변2|답변3]' 형태로 덧붙이세요.\n3. 이모지를 적절히 섞어 친구처럼 따뜻하게 대화하세요.\n4. 한 번에 질문은 하나만 하고, 짧고 명확하게 말하세요.\n5. 분모가 같은 분수의 나눗셈은 '몇 번 덜어낼 수 있는가(포함제)'로 설명하면 좋습니다.",
-            messages:history
-          })
-        });
-        const data=await res.json();
-        const reply=data&&data.content&&data.content[0]?data.content[0].text:null;
+        const history=newMsgs.slice(-6).map(m=>({role:m.senderId==="me"?"user":"assistant",content:m.text.replace(/\[예시:(.*?)\]/g,"")}));
+        const reply=await askSocrates({history});
         if(reply){
           setMessages(p=>({...p,[roomId]:[...(p[roomId]||[]),{id:`m_${Date.now()}`,senderId:"socrates",text:reply,timestamp:Date.now(),unread:0}]}));
           setRooms(p=>p.map(r=>r.id===roomId?{...r,lastUpdate:Date.now()}:r));
