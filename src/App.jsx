@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, User, MessageCircle, MoreHorizontal, ChevronLeft, UserPlus, Plus, Smile, Send, X, Play, Minus, BookOpen } from "lucide-react";
+import StudentGate from "./components/StudentGate";
 import { askSocrates } from "./services/aiClient";
+import { loadStudentProfile } from "./utils/studentProfile";
 
 const generateAppIcon = (emoji, bgColor) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${bgColor}"/><text x="50" y="50" font-size="50" text-anchor="middle" dominant-baseline="central">${emoji}</text></svg>`;
@@ -83,7 +85,7 @@ function Ctrl({label,val,dec,inc,dDis,iDis}) {
   );
 }
 
-export default function App() {
+function KakaoApp() {
   const [tab, setTab] = useState("friends");
   const [view, setView] = useState(null);
   const [friends] = useState(INITIAL_FRIENDS);
@@ -120,6 +122,16 @@ export default function App() {
       {profileUser ? <ProfileModal user={profileUser} onClose={()=>setProfileUser(null)} onChat={openChat} onApp={id=>{setProfileUser(null);setView({type:"app",id});}} onSummary={()=>{setProfileUser(null);setView({type:"summary"});}}/> : null}
     </div>
   );
+}
+
+export default function App() {
+  const [studentProfile, setStudentProfile] = useState(() => loadStudentProfile());
+
+  if (!studentProfile) {
+    return <StudentGate onStart={setStudentProfile} />;
+  }
+
+  return <KakaoApp />;
 }
 
 function FriendsTab({friends,onProfile,onSummary}) {
