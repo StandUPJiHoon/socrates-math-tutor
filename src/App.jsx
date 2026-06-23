@@ -1,9 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Search, User, MessageCircle, MoreHorizontal, ChevronLeft, UserPlus, Plus, Smile, Send, X, Play, Minus, BookOpen } from "lucide-react";
-import StudentGate from "./components/StudentGate";
-import { askSocrates } from "./services/aiClient";
-import { loadStudentProfile } from "./utils/studentProfile";
-import { getRemainingQuestions, incrementUsageCount, loadUsageCount } from "./utils/usageLimit";
 
 const generateAppIcon = (emoji, bgColor) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="${bgColor}"/><text x="50" y="50" font-size="50" text-anchor="middle" dominant-baseline="central">${emoji}</text></svg>`;
@@ -86,7 +82,7 @@ function Ctrl({label,val,dec,inc,dDis,iDis}) {
   );
 }
 
-function KakaoApp({ studentProfile }) {
+export default function App() {
   const [tab, setTab] = useState("friends");
   const [view, setView] = useState(null);
   const [friends] = useState(INITIAL_FRIENDS);
@@ -102,7 +98,7 @@ function KakaoApp({ studentProfile }) {
     setProfileUser(null); setView({type:"chat",id:rid});
   }
 
-  if(view&&view.type==="chat") return <ChatRoom roomId={view.id} rooms={rooms} setRooms={setRooms} friends={friends} msgs={messages[view.id]||[]} setMessages={setMessages} onBack={()=>setView(null)} onProfile={setProfileUser} studentProfile={studentProfile}/>;
+  if(view&&view.type==="chat") return <ChatRoom roomId={view.id} rooms={rooms} setRooms={setRooms} friends={friends} msgs={messages[view.id]||[]} setMessages={setMessages} onBack={()=>setView(null)} onProfile={setProfileUser}/>;
   if(view&&view.type==="summary") return <SummaryScreen onBack={()=>setView(null)}/>;
   if(view&&view.type==="app"){ const info=friends.find(f=>f.id===view.id); return <FractionApp appId={view.id} info={info} onBack={()=>setView(null)}/>; }
 
@@ -123,16 +119,6 @@ function KakaoApp({ studentProfile }) {
       {profileUser ? <ProfileModal user={profileUser} onClose={()=>setProfileUser(null)} onChat={openChat} onApp={id=>{setProfileUser(null);setView({type:"app",id});}} onSummary={()=>{setProfileUser(null);setView({type:"summary"});}}/> : null}
     </div>
   );
-}
-
-export default function App() {
-  const [studentProfile, setStudentProfile] = useState(() => loadStudentProfile());
-
-  if (!studentProfile) {
-    return <StudentGate onStart={setStudentProfile} />;
-  }
-
-  return <KakaoApp studentProfile={studentProfile} />;
 }
 
 function FriendsTab({friends,onProfile,onSummary}) {
@@ -260,16 +246,14 @@ function ActionBtn({icon,label,onClick}) {
   );
 }
 
-function ChatRoom({roomId,rooms,setRooms,friends,msgs,setMessages,onBack,onProfile,studentProfile}) {
+function ChatRoom({roomId,rooms,setRooms,friends,msgs,setMessages,onBack,onProfile}) {
   const room=rooms.find(r=>r.id===roomId);
   const [input,setInput]=useState("");
   const [typing,setTyping]=useState(false);
-  const [usageCount,setUsageCount]=useState(()=>loadUsageCount(studentProfile?.studentId,studentProfile?.lessonId));
   const endRef=useRef(null);
   const taRef=useRef(null);
   const lastBot=[...msgs].reverse().find(m=>m.senderId==="socrates");
   const isSocratesRoom=Boolean(room&&room.members.includes("socrates"));
-  const remainingQuestions=getRemainingQuestions(usageCount);
   const qr=useMemo(()=>{
     if(!lastBot||!lastBot.text) return [];
     const m=lastBot.text.match(/\[예시:(.*?)\]/);
@@ -279,23 +263,15 @@ function ChatRoom({roomId,rooms,setRooms,friends,msgs,setMessages,onBack,onProfi
 
   async function send(txt){
     const t=(txt===undefined?input:txt).trim(); if(!t) return;
-    if(isSocratesRoom&&remainingQuestions<=0){
-      setMessages(p=>({...p,[roomId]:[...(p[roomId]||[]),{id:`m_limit_${Date.now()}`,senderId:"socrates",text:"이번 차시 질문 100회를 모두 사용했어. 선생님께 다음 안내를 받아줘. [예시:선생님께 여쭤볼게요|정리 화면을 볼게요]",timestamp:Date.now(),unread:0}]}));
-      setRooms(p=>p.map(r=>r.id===roomId?{...r,lastUpdate:Date.now()}:r));
-      return;
-    }
     const nm={id:`m_${Date.now()}`,senderId:"me",text:t,timestamp:Date.now(),unread:0};
     const newMsgs=[...msgs,nm];
     setMessages(p=>({...p,[roomId]:newMsgs}));
     setRooms(p=>p.map(r=>r.id===roomId?{...r,lastUpdate:Date.now()}:r));
     if(txt===undefined){setInput("");if(taRef.current)taRef.current.style.height="auto";}
     if(isSocratesRoom){
-      const nextUsageCount=incrementUsageCount(studentProfile.studentId,studentProfile.lessonId);
-      setUsageCount(nextUsageCount);
       setTyping(true);
       try {
-        const history=newMsgs.slice(-6).map(m=>({role:m.senderId==="me"?"user":"assistant",content:m.text.replace(/\[예시:(.*?)\]/g,"")}));
-        const reply=await askSocrates({history});
+        const reply="좋아, 먼저 네 생각을 한 번 말해줄래? 아직 AI 연결 전이라 간단한 안내만 보여주고 있어. [예시:분수 정리 화면을 볼게|그림으로 생각해볼게]";
         if(reply){
           setMessages(p=>({...p,[roomId]:[...(p[roomId]||[]),{id:`m_${Date.now()}`,senderId:"socrates",text:reply,timestamp:Date.now(),unread:0}]}));
           setRooms(p=>p.map(r=>r.id===roomId?{...r,lastUpdate:Date.now()}:r));
@@ -343,7 +319,7 @@ function ChatRoom({roomId,rooms,setRooms,friends,msgs,setMessages,onBack,onProfi
         <span style={{fontWeight:700,fontSize:18,marginLeft:4}}>{room?room.name:""}</span>
       </div>
       {isSocratesRoom ? <div style={{background:"rgba(255,255,255,0.72)",borderBottom:"1px solid rgba(0,0,0,0.05)",padding:"7px 16px",fontSize:12,fontWeight:700,color:"#374151",flexShrink:0}}>
-        이번 차시 남은 질문: {remainingQuestions}회
+        소크라테스와 대화 중
       </div> : null}
       <div style={{flex:1,overflowY:"auto",paddingTop:8,paddingBottom:16}}>
         {rendered}
